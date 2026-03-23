@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis CLI Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #111111;
+    --border: #1e1e1e;
+    --redis-red: #ff2d20;
+    --redis-orange: #ff6b35;
+    --green: #00ff88;
+    --cyan: #00d4ff;
+    --yellow: #ffd700;
+    --white: #e8e8e8;
+    --muted: #555;
+    --dim: #333;
+    --error: #ff4444;
+    --integer: #a78bfa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    user-select: none;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .redis-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .logo-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--redis-red);
+    letter-spacing: 0.03em;
+  }
+
+  .logo-sep { color: var(--muted); font-size: 18px; }
+
+  .logo-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .header-pills {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pill-green { background: rgba(0,255,136,0.1); color: var(--green); border: 1px solid rgba(0,255,136,0.2); }
+  .pill-red   { background: rgba(255,45,32,0.1);  color: var(--redis-red); border: 1px solid rgba(255,45,32,0.2); }
+
+  /* ── Layout ── */
+  .workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 57px);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-title {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .sidebar-section-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .cmd-group { display: flex; flex-direction: column; gap: 2px; }
+
+  .cmd-item {
+    font-size: 11px;
+    color: #888;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 3px;
+    transition: all 0.12s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cmd-item:hover { background: var(--dim); color: var(--white); }
+  .cmd-item .cmd-name { color: var(--cyan); font-weight: 500; }
+  .cmd-item .cmd-desc { font-size: 9px; color: #555; margin-left: 6px; }
+
+  .db-stats { padding: 12px 14px; margin-top: auto; border-top: 1px solid var(--border); }
+  .db-stats-title { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+  .stat-row { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; }
+  .stat-label { color: #555; }
+  .stat-val { color: var(--green); font-weight: 500; }
+
+  /* ── Terminal ── */
+  .terminal-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .terminal-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: #0f0f0f;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #febc2e; }
+  .dot-g { background: #28c840; }
+
+  .terminal-title {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  .terminal-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn-clear {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--dim);
+    color: #555;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+    letter-spacing: 0.05em;
+  }
+  .btn-clear:hover { border-color: var(--muted); color: var(--white); }
+
+  #output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    scroll-behavior: smooth;
+  }
+
+  #output::-webkit-scrollbar { width: 4px; }
+  #output::-webkit-scrollbar-track { background: transparent; }
+  #output::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+
+  .output-line {
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    animation: fadein 0.1s ease;
+  }
+
+  @keyframes fadein { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+  .line-cmd    { color: var(--white); }
+  .line-prompt { color: var(--redis-red); }
+  .line-ok     { color: var(--green); }
+  .line-string { color: var(--yellow); }
+  .line-int    { color: var(--integer); }
+  .line-array  { color: var(--cyan); }
+  .line-null   { color: var(--muted); font-style: italic; }
+  .line-error  { color: var(--error); }
+  .line-info   { color: var(--muted); font-size: 11px; }
+  .line-sep    { color: var(--dim); font-size: 11px; }
+
+  /* ── Input ── */
+  .input-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    background: #0f0f0f;
+    gap: 10px;
+  }
+
+  .prompt-label {
+    color: var(--redis-red);
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .prompt-db {
+    font-size: 11px;
+    color: #444;
+    font-weight: 300;
+  }
+
+  #cli-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--white);
+    caret-color: var(--redis-red);
+  }
+
+  #cli-input::placeholder { color: #2a2a2a; }
+
+  .input-hint {
+    font-size: 10px;
+    color: #2a2a2a;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <!-- Redis logo SVG -->
+    <svg class="redis-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M29.5 19.8L16 27 2.5 19.8l13.5-7.2 13.5 7.2z" fill="#A41E11"/>
+      <path d="M29.5 15.5L16 22.7 2.5 15.5l13.5-7.2 13.5 7.2z" fill="#D82C20"/>
+      <path d="M29.5 11.2L16 18.4 2.5 11.2 16 4l13.5 7.2z" fill="#FF6B6B"/>
+      <ellipse cx="16" cy="18.4" rx="5" ry="2.5" fill="#A41E11"/>
+      <ellipse cx="16" cy="11.2" rx="5" ry="2.5" fill="#FF6B6B"/>
+    </svg>
+    <span class="logo-text">redis-cli</span>
+    <span class="logo-sep">|</span>
+    <span class="logo-sub">browser simulator · in-memory · no backend</span>
+  </div>
+  <div class="header-pills">
+    <span class="pill pill-green">● connected</span>
+    <span class="pill pill-red">redis 7.2</span>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-title">Quick Reference</div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Strings</div>
+      <div class="cmd-group">
+        <div class="cmd-item" onclick="insertCmd('SET key value')"><span class="cmd-name">SET</span><span class="cmd-desc">set key</span></div>
+        <div class="cmd-item" onclick="insertCmd('GET key')"><span class="cmd-name">GET</span><span class="cmd-desc">get key</span></div>
+        <div class="cmd-item" onclick="insertCmd('MSET k1 v1 k2 v2')"><span class="cmd-name">MSET</span><span class="cmd-desc">multi-set</span></div>
+        <div class="cmd-item" onclick="insertCmd('MGET k1 k2')"><span class="cmd-name">MGET</span><span class="cmd-desc">multi-get</span></div>
+        <div class="cmd-item" onclick="insertCmd('INCR counter')"><span class="cmd-name">INCR</span><span class="cmd-desc">increment</span></div>
+        <div class="cmd-item" onclick="insertCmd('INCRBY counter 5')"><span class="cmd-name">INCRBY</span><span class="cmd-desc">incr by N</span></div>
+        <div class="cmd-item" onclick="insertCmd('APPEND key \" more\"')"><span class="cmd-name">APPEND</span><span class="cmd-desc">append str</span></div>
+        <div class="cmd-item" onclick="insertCmd('STRLEN key')"><span class="cmd-name">STRLEN</span><span class="cmd-desc">str length</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Keys</div>
+      <div class="cmd-group">
+        <div class="cmd-item" onclick="insertCmd('KEYS *')"><span class="cmd-name">KEYS</span><span class="cmd-desc">pattern</span></div>
+        <div class="cmd-item" onclick="insertCmd('EXISTS key')"><span class="cmd-name">EXISTS</span><span class="cmd-desc">check key</span></div>
+        <div class="cmd-item" onclick="insertCmd('DEL key')"><span class="cmd-name">DEL</span><span class="cmd-desc">delete</span></div>
+        <div class="cmd-item" onclick="insertCmd('TYPE key')"><span class="cmd-name">TYPE</span><span class="cmd-desc">data type</span></div>
+        <div class="cmd-item" onclick="insertCmd('EXPIRE key 60')"><span class="cmd-name">EXPIRE</span><span class="cmd-desc">set TTL</span></div>
+        <div class="cmd-item" onclick="insertCmd('TTL key')"><span class="cmd-name">TTL</span><span class="cmd-desc">time to live</span></div>
+        <div class="cmd-item" onclick="insertCmd('PERSIST key')"><span class="cmd-name">PERSIST</span><span class="cmd-desc">rm expire</span></div>
+        <div class="cmd-item" onclick="insertCmd('RENAME key newkey')"><span class="cmd-name">RENAME</span><span class="cmd-desc">rename</span></div>
+        <div class="cmd-item" onclick="insertCmd('DBSIZE')"><span class="cmd-name">DBSIZE</span><span class="cmd-desc">key count</span></div>
+        <div class="cmd-item" onclick="insertCmd('FLUSHDB')"><span class="cmd-name">FLUSHDB</span><span class="cmd-desc">clear all</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Lists</div>
+      <div class="cmd-group">
+        <div class="cmd-item" onclick="insertCmd('LPUSH mylist a b c')"><span class="cmd-name">LPUSH</span><span class="cmd-desc">push left</span></div>
+        <div class="cmd-item" onclick="insertCmd('RPUSH mylist a b c')"><span class="cmd-name">RPUSH</span><span class="cmd-desc">push right</span></div>
+        <div class="cmd-item" onclick="insertCmd('LPOP mylist')"><span class="cmd-name">LPOP</span><span class="cmd-desc">pop left</span></div>
+        <div class="cmd-item" onclick="insertCmd('RPOP mylist')"><span class="cmd-name">RPOP</span><span class="cmd-desc">pop right</span></div>
+        <div class="cmd-item" onclick="insertCmd('LRANGE mylist 0 -1')"><span class="cmd-name">LRANGE</span><span class="cmd-desc">get range</span></div>
+        <div class="cmd-item" onclick="insertCmd('LLEN mylist')"><span class="cmd-name">LLEN</span><span class="cmd-desc">list length</span></div>
+        <div class="cmd-item" onclick="insertCmd('LINDEX mylist 0')"><span class="cmd-name">LINDEX</span><span class="cmd-desc">get by idx</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Hashes</div>
+      <div class="cmd-group">
+        <div class="cmd-item" onclick="insertCmd('HSET user name Alice age 30')"><span class="cmd-name">HSET</span><span class="cmd-desc">set field</span></div>
+        <div class="cmd-item" onclick="insertCmd('HGET user name')"><span class="cmd-name">HGET</span><span class="cmd-desc">get field</span></div>
+        <div class="cmd-item" onclick="insertCmd('HGETALL user')"><span class="cmd-name">HGETALL</span><span class="cmd-desc">all fields</span></div>
+        <div class="cmd-item" onclick="insertCmd('HKEYS user')"><span class="cmd-name">HKEYS</span><span class="cmd-desc">all keys</span></div>
+        <div class="cmd-item" onclick="insertCmd('HVALS user')"><span class="cmd-name">HVALS</span><span class="cmd-desc">all values</span></div>
+        <div class="cmd-item" onclick="insertCmd('HDEL user age')"><span class="cmd-name">HDEL</span><span class="cmd-desc">del field</span></div>
+        <div class="cmd-item" onclick="insertCmd('HLEN user')"><span class="cmd-name">HLEN</span><span class="cmd-desc">field count</span></div>
+        <div class="cmd-item" onclick="insertCmd('HEXISTS user name')"><span class="cmd-name">HEXISTS</span><span class="cmd-desc">field exists</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Sets</div>
+      <div class="cmd-group">
+        <div class="cmd-item" onclick="insertCmd('SADD myset a b c')"><span class="cmd-name">SADD</span><span class="cmd-desc">add members</span></div>
+        <div class="cmd-item" onclick="insertCmd('SMEMBERS myset')"><span class="cmd-name">SMEMBERS</span><span class="cmd-desc">all members</span></div>
+        <div class="cmd-item" onclick="insertCmd('SREM myset a')"><span class="cmd-name">SREM</span><span class="cmd-desc">remove</span></div>
+        <div class="cmd-item" onclick="insertCmd('SCARD myset')"><span class="cmd-name">SCARD</span><span class="cmd-desc">set size</span></div>
+        <div class="cmd-item" onclick="insertCmd('SISMEMBER myset a')"><span class="cmd-name">SISMEMBER</span><span class="cmd-desc">is member</span></div>
+        <div class="cmd-item" onclick="insertCmd('SUNION s1 s2')"><span class="cmd-name">SUNION</span><span class="cmd-desc">union</span></div>
+        <div class="cmd-item" onclick="insertCmd('SINTER s1 s2')"><span class="cmd-name">SINTER</span><span class="cmd-desc">intersect</span></div>
+        <div class="cmd-item" onclick="insertCmd('SDIFF s1 s2')"><span class="cmd-name">SDIFF</span><span class="cmd-desc">difference</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Sorted Sets</div>
+      <div class="cmd-group">
+        <div class="cmd-item" onclick="insertCmd('ZADD leaderboard 100 alice 200 bob')"><span class="cmd-name">ZADD</span><span class="cmd-desc">add member</span></div>
+        <div class="cmd-item" onclick="insertCmd('ZRANGE leaderboard 0 -1 WITHSCORES')"><span class="cmd-name">ZRANGE</span><span class="cmd-desc">get range</span></div>
+        <div class="cmd-item" onclick="insertCmd('ZSCORE leaderboard alice')"><span class="cmd-name">ZSCORE</span><span class="cmd-desc">get score</span></div>
+        <div class="cmd-item" onclick="insertCmd('ZRANK leaderboard alice')"><span class="cmd-name">ZRANK</span><span class="cmd-desc">get rank</span></div>
+        <div class="cmd-item" onclick="insertCmd('ZCARD leaderboard')"><span class="cmd-name">ZCARD</span><span class="cmd-desc">set size</span></div>
+        <div class="cmd-item" onclick="insertCmd('ZREM leaderboard alice')"><span class="cmd-name">ZREM</span><span class="cmd-desc">remove</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Server</div>
+      <div class="cmd-group">
+        <div class="cmd-item" onclick="insertCmd('PING')"><span class="cmd-name">PING</span><span class="cmd-desc">heartbeat</span></div>
+        <div class="cmd-item" onclick="insertCmd('ECHO hello')"><span class="cmd-name">ECHO</span><span class="cmd-desc">echo back</span></div>
+        <div class="cmd-item" onclick="insertCmd('INFO')"><span class="cmd-name">INFO</span><span class="cmd-desc">server info</span></div>
+        <div class="cmd-item" onclick="insertCmd('SELECT 0')"><span class="cmd-name">SELECT</span><span class="cmd-desc">switch db</span></div>
+        <div class="cmd-item" onclick="insertCmd('COMMAND COUNT')"><span class="cmd-name">COMMAND</span><span class="cmd-desc">cmd info</span></div>
+        <div class="cmd-item" onclick="insertCmd('DEBUG SLEEP 0')"><span class="cmd-name">DEBUG</span><span class="cmd-desc">debug</span></div>
+      </div>
+    </div>
+
+    <div class="db-stats">
+      <div class="db-stats-title">DB State</div>
+      <div class="stat-row"><span class="stat-label">keys</span><span class="stat-val" id="stat-keys">0</span></div>
+      <div class="stat-row"><span class="stat-label">db</span><span class="stat-val" id="stat-db">0</span></div>
+      <div class="stat-row"><span class="stat-label">commands</span><span class="stat-val" id="stat-cmds">0</span></div>
+    </div>
+  </aside>
+
+  <!-- Terminal -->
+  <div class="terminal-wrap">
+    <div class="terminal-bar">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+      <span class="terminal-title">redis-cli — 127.0.0.1:6379</span>
+      <div class="terminal-actions">
+        <button class="btn-clear" onclick="clearOutput()">clear</button>
+      </div>
+    </div>
+
+    <div id="output"></div>
+
+    <div class="input-row">
+      <span class="prompt-label">
+        127.0.0.1:6379<span class="prompt-db" id="prompt-db">[0]</span>&gt;
+      </span>
+      <input id="cli-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false"
+             placeholder="type a command…" autofocus>
+      <span class="input-hint">↑↓ history · Tab complete</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  In-memory Redis store (16 databases)
+// ─────────────────────────────────────────────
+const NUM_DBS = 16;
+let currentDb = 0;
+let cmdCount = 0;
+
+function makeDb() { return { data: new Map(), expires: new Map() }; }
+const databases = Array.from({ length: NUM_DBS }, makeDb);
+const getDb = () => databases[currentDb];
+
+// Expire helpers
+function isExpired(db, key) {
+  if (!db.expires.has(key)) return false;
+  if (Date.now() >= db.expires.get(key)) {
+    db.data.delete(key);
+    db.expires.delete(key);
+    return true;
+  }
+  return false;
+}
+function liveGet(key) {
+  const db = getDb();
+  if (isExpired(db, key)) return undefined;
+  return db.data.get(key);
+}
+function liveHas(key) { return liveGet(key) !== undefined; }
+function liveKeys() {
+  const db = getDb();
+  const keys = [];
+  for (const k of db.data.keys()) {
+    if (!isExpired(db, k)) keys.push(k);
+  }
+  return keys;
+}
+
+// ─────────────────────────────────────────────
+//  Command parser (handles quoted strings)
+// ─────────────────────────────────────────────
+function parseArgs(input) {
+  const args = [];
+  let current = '';
+  let inSingle = false, inDouble = false;
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (c === "'" && !inDouble) { inSingle = !inSingle; continue; }
+    if (c === '"' && !inSingle) { inDouble = !inDouble; continue; }
+    if (c === ' ' && !inSingle && !inDouble) {
+      if (current) { args.push(current); current = ''; }
+    } else {
+      current += c;
+    }
+  }
+  if (current) args.push(current);
+  return args;
+}
+
+// ─────────────────────────────────────────────
+//  Type helpers
+// ─────────────────────────────────────────────
+function assertType(key, expected) {
+  const val = liveGet(key);
+  if (val === undefined) return null; // key doesn't exist — OK
+  if (typeof val === 'string' && expected === 'string') return null;
+  if (val instanceof Array && expected === 'list') return null;
+  if (val instanceof Map && expected === 'hash') return null;
+  if (val instanceof Set && expected === 'set') return null;
+  if (val instanceof ZSet && expected === 'zset') return null;
+  return `WRONGTYPE Operation against a key holding the wrong kind of value`;
+}
+
+class ZSet {
+  constructor() { this.scores = new Map(); } // member -> score
+  add(score, member) { this.scores.set(member, parseFloat(score)); }
+  remove(member) { return this.scores.delete(member); }
+  score(member) { return this.scores.get(member); }
+  card() { return this.scores.size; }
+  sorted() { return [...this.scores.entries()].sort((a, b) => a[1] - b[1]); }
+  rank(member) {
+    const s = this.sorted();
+    const idx = s.findIndex(([m]) => m === member);
+    return idx === -1 ? null : idx;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Pattern matching for KEYS
+// ─────────────────────────────────────────────
+function globMatch(pattern, str) {
+  const rx = '^' + pattern.replace(/[-[\]{}()+.,\\^$|#\s]/g, '\\$&')
+    .replace(/\*/g, '.*').replace(/\?/g, '.') + '$';
+  return new RegExp(rx).test(str);
+}
+
+// ─────────────────────────────────────────────
+//  Command handlers
+// ─────────────────────────────────────────────
+function execCommand(raw) {
+  const args = parseArgs(raw.trim());
+  if (!args.length) return null;
+  const cmd = args[0].toUpperCase();
+  const rest = args.slice(1);
+
+  switch (cmd) {
+    // ── Server ──────────────────────────────
+    case 'PING':
+      return { type: 'ok', value: rest.length ? rest[0] : 'PONG' };
+
+    case 'ECHO':
+      if (!rest.length) return err('wrong number of arguments for ECHO');
+      return { type: 'string', value: rest[0] };
+
+    case 'SELECT': {
+      const n = parseInt(rest[0]);
+      if (isNaN(n) || n < 0 || n >= NUM_DBS) return err(`DB index is out of range`);
+      currentDb = n;
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'DBSIZE':
+      return { type: 'int', value: liveKeys().length };
+
+    case 'FLUSHDB':
+      getDb().data.clear(); getDb().expires.clear();
+      return { type: 'ok', value: 'OK' };
+
+    case 'FLUSHALL':
+      databases.forEach(d => { d.data.clear(); d.expires.clear(); });
+      return { type: 'ok', value: 'OK' };
+
+    case 'INFO':
+      return { type: 'string', value: [
+        '# Server',
+        'redis_version:7.2.0',
+        'redis_mode:standalone',
+        'os:Linux (browser simulation)',
+        '',
+        '# Keyspace',
+        `db${currentDb}:keys=${liveKeys().length},expires=${getDb().expires.size}`,
+        '',
+        '# Stats',
+        `total_commands_processed:${cmdCount}`,
+        `connected_clients:1`,
+      ].join('\n') };
+
+    case 'COMMAND':
+      if (rest[0]?.toUpperCase() === 'COUNT') return { type: 'int', value: 50 };
+      return { type: 'ok', value: 'OK' };
+
+    case 'DEBUG':
+      return { type: 'ok', value: 'OK' };
+
+    case 'RESET':
+      return { type: 'ok', value: 'RESET' };
+
+    case 'QUIT':
+      return { type: 'string', value: 'Bye! (simulator stays open)' };
+
+    // ── Keys ────────────────────────────────
+    case 'KEYS': {
+      const pattern = rest[0] || '*';
+      return { type: 'array', value: liveKeys().filter(k => globMatch(pattern, k)) };
+    }
+
+    case 'EXISTS': {
+      if (!rest.length) return err('wrong number of arguments for EXISTS');
+      let count = 0;
+      for (const k of rest) if (liveHas(k)) count++;
+      return { type: 'int', value: count };
+    }
+
+    case 'DEL': {
+      if (!rest.length) return err('wrong number of arguments for DEL');
+      let count = 0;
+      for (const k of rest) {
+        if (liveHas(k)) {
+          getDb().data.delete(k); getDb().expires.delete(k); count++;
+        }
+      }
+      return { type: 'int', value: count };
+    }
+
+    case 'UNLINK': {
+      // Same as DEL in simulator
+      if (!rest.length) return err('wrong number of arguments for UNLINK');
+      let count = 0;
+      for (const k of rest) if (liveHas(k)) { getDb().data.delete(k); getDb().expires.delete(k); count++; }
+      return { type: 'int', value: count };
+    }
+
+    case 'TYPE': {
+      if (!rest.length) return err('wrong number of arguments for TYPE');
+      const v = liveGet(rest[0]);
+      if (v === undefined) return { type: 'string', value: 'none' };
+      if (typeof v === 'string') return { type: 'string', value: 'string' };
+      if (v instanceof Array) return { type: 'string', value: 'list' };
+      if (v instanceof Map) return { type: 'string', value: 'hash' };
+      if (v instanceof Set) return { type: 'string', value: 'set' };
+      if (v instanceof ZSet) return { type: 'string', value: 'zset' };
+      return { type: 'string', value: 'unknown' };
+    }
+
+    case 'RENAME': {
+      if (rest.length < 2) return err('wrong number of arguments for RENAME');
+      const [src, dst] = rest;
+      if (!liveHas(src)) return err('ERR no such key');
+      const val = liveGet(src);
+      const ttl = getDb().expires.get(src);
+      getDb().data.delete(src); getDb().expires.delete(src);
+      getDb().data.set(dst, val);
+      if (ttl) getDb().expires.set(dst, ttl);
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'COPY': {
+      if (rest.length < 2) return err('wrong number of arguments for COPY');
+      const [src, dst] = rest;
+      if (!liveHas(src)) return err('ERR no such key');
+      if (liveHas(dst) && !rest.includes('REPLACE')) return { type: 'int', value: 0 };
+      getDb().data.set(dst, structuredClone(liveGet(src)));
+      return { type: 'int', value: 1 };
+    }
+
+    case 'EXPIRE': {
+      if (rest.length < 2) return err('wrong number of arguments for EXPIRE');
+      const [key, secs] = rest;
+      if (!liveHas(key)) return { type: 'int', value: 0 };
+      getDb().expires.set(key, Date.now() + parseInt(secs) * 1000);
+      return { type: 'int', value: 1 };
+    }
+
+    case 'EXPIREAT': {
+      if (rest.length < 2) return err('wrong number of arguments for EXPIREAT');
+      const [key, ts] = rest;
+      if (!liveHas(key)) return { type: 'int', value: 0 };
+      getDb().expires.set(key, parseInt(ts) * 1000);
+      return { type: 'int', value: 1 };
+    }
+
+    case 'PEXPIRE': {
+      if (rest.length < 2) return err('wrong number of arguments for PEXPIRE');
+      const [key, ms] = rest;
+      if (!liveHas(key)) return { type: 'int', value: 0 };
+      getDb().expires.set(key, Date.now() + parseInt(ms));
+      return { type: 'int', value: 1 };
+    }
+
+    case 'TTL': {
+      if (!rest.length) return err('wrong number of arguments for TTL');
+      const key = rest[0];
+      if (!liveHas(key)) return { type: 'int', value: -2 };
+      if (!getDb().expires.has(key)) return { type: 'int', value: -1 };
+      const rem = Math.ceil((getDb().expires.get(key) - Date.now()) / 1000);
+      return { type: 'int', value: rem };
+    }
+
+    case 'PTTL': {
+      if (!rest.length) return err('wrong number of arguments for PTTL');
+      const key = rest[0];
+      if (!liveHas(key)) return { type: 'int', value: -2 };
+      if (!getDb().expires.has(key)) return { type: 'int', value: -1 };
+      return { type: 'int', value: getDb().expires.get(key) - Date.now() };
+    }
+
+    case 'PERSIST': {
+      if (!rest.length) return err('wrong number of arguments for PERSIST');
+      const key = rest[0];
+      if (!liveHas(key) || !getDb().expires.has(key)) return { type: 'int', value: 0 };
+      getDb().expires.delete(key);
+      return { type: 'int', value: 1 };
+    }
+
+    case 'RANDOMKEY': {
+      const keys = liveKeys();
+      if (!keys.length) return { type: 'null' };
+      return { type: 'string', value: keys[Math.floor(Math.random() * keys.length)] };
+    }
+
+    case 'SCAN': {
+      // Simplified: return all matching keys
+      const pattern = (rest.find((_, i) => rest[i - 1]?.toUpperCase() === 'MATCH') || '*');
+      const count = parseInt(rest.find((_, i) => rest[i - 1]?.toUpperCase() === 'COUNT') || '10');
+      const matched = liveKeys().filter(k => globMatch(pattern, k));
+      return { type: 'array', value: ['0', matched] };
+    }
+
+    case 'OBJECT':
+      return { type: 'string', value: 'embstr' };
+
+    // ── Strings ─────────────────────────────
+    case 'SET': {
+      if (rest.length < 2) return err('wrong number of arguments for SET');
+      const [key, val] = rest;
+      const upperRest = rest.map(r => r.toUpperCase());
+      // Handle NX / XX
+      if (upperRest.includes('NX') && liveHas(key)) return { type: 'null' };
+      if (upperRest.includes('XX') && !liveHas(key)) return { type: 'null' };
+      getDb().data.set(key, String(val));
+      // Handle EX / PX
+      const exIdx = upperRest.indexOf('EX');
+      const pxIdx = upperRest.indexOf('PX');
+      if (exIdx !== -1) getDb().expires.set(key, Date.now() + parseInt(rest[exIdx + 1]) * 1000);
+      else if (pxIdx !== -1) getDb().expires.set(key, Date.now() + parseInt(rest[pxIdx + 1]));
+      else getDb().expires.delete(key);
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'GET': {
+      if (!rest.length) return err('wrong number of arguments for GET');
+      const e = assertType(rest[0], 'string');
+      if (e) return err(e);
+      const v = liveGet(rest[0]);
+      return v === undefined ? { type: 'null' } : { type: 'string', value: v };
+    }
+
+    case 'GETSET': {
+      if (rest.length < 2) return err('wrong number of arguments for GETSET');
+      const e = assertType(rest[0], 'string');
+      if (e) return err(e);
+      const old = liveGet(rest[0]);
+      getDb().data.set(rest[0], String(rest[1]));
+      return old === undefined ? { type: 'null' } : { type: 'string', value: old };
+    }
+
+    case 'GETDEL': {
+      if (!rest.length) return err('wrong number of arguments for GETDEL');
+      const v = liveGet(rest[0]);
+      if (v === undefined) return { type: 'null' };
+      getDb().data.delete(rest[0]); getDb().expires.delete(rest[0]);
+      return { type: 'string', value: v };
+    }
+
+    case 'SETNX': {
+      if (rest.length < 2) return err('wrong number of arguments for SETNX');
+      if (liveHas(rest[0])) return { type: 'int', value: 0 };
+      getDb().data.set(rest[0], String(rest[1]));
+      return { type: 'int', value: 1 };
+    }
+
+    case 'SETEX': {
+      if (rest.length < 3) return err('wrong number of arguments for SETEX');
+      getDb().data.set(rest[0], String(rest[2]));
+      getDb().expires.set(rest[0], Date.now() + parseInt(rest[1]) * 1000);
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'PSETEX': {
+      if (rest.length < 3) return err('wrong number of arguments for PSETEX');
+      getDb().data.set(rest[0], String(rest[2]));
+      getDb().expires.set(rest[0], Date.now() + parseInt(rest[1]));
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'MSET': {
+      if (rest.length < 2 || rest.length % 2 !== 0) return err('wrong number of arguments for MSET');
+      for (let i = 0; i < rest.length; i += 2) getDb().data.set(rest[i], String(rest[i + 1]));
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'MSETNX': {
+      if (rest.length < 2 || rest.length % 2 !== 0) return err('wrong number of arguments for MSETNX');
+      for (let i = 0; i < rest.length; i += 2) if (liveHas(rest[i])) return { type: 'int', value: 0 };
+      for (let i = 0; i < rest.length; i += 2) getDb().data.set(rest[i], String(rest[i + 1]));
+      return { type: 'int', value: 1 };
+    }
+
+    case 'MGET': {
+      if (!rest.length) return err('wrong number of arguments for MGET');
+      return { type: 'array', value: rest.map(k => liveGet(k) ?? null) };
+    }
+
+    case 'INCR': {
+      if (!rest.length) return err('wrong number of arguments for INCR');
+      const cur = liveGet(rest[0]);
+      const n = cur === undefined ? 0 : parseInt(cur);
+      if (isNaN(n)) return err('ERR value is not an integer or out of range');
+      const next = n + 1; getDb().data.set(rest[0], String(next));
+      return { type: 'int', value: next };
+    }
+
+    case 'DECR': {
+      if (!rest.length) return err('wrong number of arguments for DECR');
+      const cur = liveGet(rest[0]);
+      const n = cur === undefined ? 0 : parseInt(cur);
+      if (isNaN(n)) return err('ERR value is not an integer or out of range');
+      const next = n - 1; getDb().data.set(rest[0], String(next));
+      return { type: 'int', value: next };
+    }
+
+    case 'INCRBY': {
+      if (rest.length < 2) return err('wrong number of arguments for INCRBY');
+      const cur = liveGet(rest[0]); const by = parseInt(rest[1]);
+      const n = cur === undefined ? 0 : parseInt(cur);
+      if (isNaN(n) || isNaN(by)) return err('ERR value is not an integer or out of range');
+      const next = n + by; getDb().data.set(rest[0], String(next));
+      return { type: 'int', value: next };
+    }
+
+    case 'DECRBY': {
+      if (rest.length < 2) return err('wrong number of arguments for DECRBY');
+      const cur = liveGet(rest[0]); const by = parseInt(rest[1]);
+      const n = cur === undefined ? 0 : parseInt(cur);
+      if (isNaN(n) || isNaN(by)) return err('ERR value is not an integer or out of range');
+      const next = n - by; getDb().data.set(rest[0], String(next));
+      return { type: 'int', value: next };
+    }
+
+    case 'INCRBYFLOAT': {
+      if (rest.length < 2) return err('wrong number of arguments for INCRBYFLOAT');
+      const cur = liveGet(rest[0]); const by = parseFloat(rest[1]);
+      const n = cur === undefined ? 0 : parseFloat(cur);
+      if (isNaN(n) || isNaN(by)) return err('ERR value is not a valid float');
+      const next = n + by;
+      const str = String(parseFloat(next.toPrecision(17)));
+      getDb().data.set(rest[0], str);
+      return { type: 'string', value: str };
+    }
+
+    case 'APPEND': {
+      if (rest.length < 2) return err('wrong number of arguments for APPEND');
+      const e = assertType(rest[0], 'string');
+      if (e) return err(e);
+      const cur = liveGet(rest[0]) ?? '';
+      const next = cur + rest[1];
+      getDb().data.set(rest[0], next);
+      return { type: 'int', value: next.length };
+    }
+
+    case 'STRLEN': {
+      if (!rest.length) return err('wrong number of arguments for STRLEN');
+      const e = assertType(rest[0], 'string');
+      if (e) return err(e);
+      return { type: 'int', value: (liveGet(rest[0]) ?? '').length };
+    }
+
+    case 'GETRANGE': case 'SUBSTR': {
+      if (rest.length < 3) return err('wrong number of arguments for GETRANGE');
+      const s = liveGet(rest[0]) ?? '';
+      let start = parseInt(rest[1]), end = parseInt(rest[2]);
+      if (start < 0) start = Math.max(0, s.length + start);
+      if (end < 0) end = s.length + end;
+      return { type: 'string', value: s.slice(start, end + 1) };
+    }
+
+    case 'SETRANGE': {
+      if (rest.length < 3) return err('wrong number of arguments for SETRANGE');
+      let s = liveGet(rest[0]) ?? '';
+      const off = parseInt(rest[1]);
+      while (s.length < off) s += '\0';
+      s = s.slice(0, off) + rest[2] + s.slice(off + rest[2].length);
+      getDb().data.set(rest[0], s);
+      return { type: 'int', value: s.length };
+    }
+
+    // ── Lists ────────────────────────────────
+    case 'LPUSH': case 'LPUSHX': {
+      if (rest.length < 2) return err(`wrong number of arguments for ${cmd}`);
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      if (cmd === 'LPUSHX' && !liveHas(rest[0])) return { type: 'int', value: 0 };
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], []);
+      const list = liveGet(rest[0]);
+      for (let i = 1; i < rest.length; i++) list.unshift(rest[i]);
+      return { type: 'int', value: list.length };
+    }
+
+    case 'RPUSH': case 'RPUSHX': {
+      if (rest.length < 2) return err(`wrong number of arguments for ${cmd}`);
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      if (cmd === 'RPUSHX' && !liveHas(rest[0])) return { type: 'int', value: 0 };
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], []);
+      const list = liveGet(rest[0]);
+      for (let i = 1; i < rest.length; i++) list.push(rest[i]);
+      return { type: 'int', value: list.length };
+    }
+
+    case 'LPOP': {
+      if (!rest.length) return err('wrong number of arguments for LPOP');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]);
+      if (!list || !list.length) return { type: 'null' };
+      const count = rest[1] ? parseInt(rest[1]) : null;
+      if (count === null) return { type: 'string', value: list.shift() };
+      return { type: 'array', value: list.splice(0, count) };
+    }
+
+    case 'RPOP': {
+      if (!rest.length) return err('wrong number of arguments for RPOP');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]);
+      if (!list || !list.length) return { type: 'null' };
+      const count = rest[1] ? parseInt(rest[1]) : null;
+      if (count === null) return { type: 'string', value: list.pop() };
+      return { type: 'array', value: list.splice(-count).reverse() };
+    }
+
+    case 'LLEN': {
+      if (!rest.length) return err('wrong number of arguments for LLEN');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      return { type: 'int', value: (liveGet(rest[0]) ?? []).length };
+    }
+
+    case 'LRANGE': {
+      if (rest.length < 3) return err('wrong number of arguments for LRANGE');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]) ?? [];
+      let s = parseInt(rest[1]), e2 = parseInt(rest[2]);
+      if (s < 0) s = Math.max(0, list.length + s);
+      if (e2 < 0) e2 = list.length + e2;
+      return { type: 'array', value: list.slice(s, e2 + 1) };
+    }
+
+    case 'LINDEX': {
+      if (rest.length < 2) return err('wrong number of arguments for LINDEX');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]) ?? [];
+      let idx = parseInt(rest[1]);
+      if (idx < 0) idx = list.length + idx;
+      const v = list[idx];
+      return v === undefined ? { type: 'null' } : { type: 'string', value: v };
+    }
+
+    case 'LSET': {
+      if (rest.length < 3) return err('wrong number of arguments for LSET');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]);
+      if (!list) return err('ERR no such key');
+      let idx = parseInt(rest[1]);
+      if (idx < 0) idx = list.length + idx;
+      if (idx < 0 || idx >= list.length) return err('ERR index out of range');
+      list[idx] = rest[2];
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'LREM': {
+      if (rest.length < 3) return err('wrong number of arguments for LREM');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]);
+      if (!list) return { type: 'int', value: 0 };
+      let count = parseInt(rest[1]); const elem = rest[2];
+      let removed = 0;
+      if (count === 0) {
+        const prev = list.length;
+        const filtered = list.filter(v => v !== elem);
+        removed = prev - filtered.length;
+        list.length = 0; filtered.forEach(v => list.push(v));
+      } else if (count > 0) {
+        for (let i = 0; i < list.length && removed < count;) {
+          if (list[i] === elem) { list.splice(i, 1); removed++; } else i++;
+        }
+      } else {
+        count = -count;
+        for (let i = list.length - 1; i >= 0 && removed < count;) {
+          if (list[i] === elem) { list.splice(i, 1); removed++; } else i--;
+        }
+      }
+      return { type: 'int', value: removed };
+    }
+
+    case 'LINSERT': {
+      if (rest.length < 4) return err('wrong number of arguments for LINSERT');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]);
+      if (!list) return { type: 'int', value: -1 };
+      const pivot = rest[2], element = rest[3];
+      const idx = list.indexOf(pivot);
+      if (idx === -1) return { type: 'int', value: -1 };
+      list.splice(rest[1].toUpperCase() === 'BEFORE' ? idx : idx + 1, 0, element);
+      return { type: 'int', value: list.length };
+    }
+
+    case 'LTRIM': {
+      if (rest.length < 3) return err('wrong number of arguments for LTRIM');
+      const e = assertType(rest[0], 'list');
+      if (e) return err(e);
+      const list = liveGet(rest[0]);
+      if (!list) return { type: 'ok', value: 'OK' };
+      let s = parseInt(rest[1]), en = parseInt(rest[2]);
+      if (s < 0) s = Math.max(0, list.length + s);
+      if (en < 0) en = list.length + en;
+      const trimmed = list.slice(s, en + 1);
+      list.length = 0; trimmed.forEach(v => list.push(v));
+      return { type: 'ok', value: 'OK' };
+    }
+
+    case 'RPOPLPUSH': {
+      if (rest.length < 2) return err('wrong number of arguments for RPOPLPUSH');
+      const src = rest[0], dst = rest[1];
+      const srcList = liveGet(src);
+      if (!srcList || !srcList.length) return { type: 'null' };
+      const val = srcList.pop();
+      if (!liveHas(dst)) getDb().data.set(dst, []);
+      liveGet(dst).unshift(val);
+      return { type: 'string', value: val };
+    }
+
+    // ── Hashes ──────────────────────────────
+    case 'HSET': case 'HMSET': {
+      if (rest.length < 3 || (rest.length - 1) % 2 !== 0) return err(`wrong number of arguments for ${cmd}`);
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], new Map());
+      const hash = liveGet(rest[0]);
+      let added = 0;
+      for (let i = 1; i < rest.length; i += 2) {
+        if (!hash.has(rest[i])) added++;
+        hash.set(rest[i], rest[i + 1]);
+      }
+      return cmd === 'HMSET' ? { type: 'ok', value: 'OK' } : { type: 'int', value: added };
+    }
+
+    case 'HSETNX': {
+      if (rest.length < 3) return err('wrong number of arguments for HSETNX');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], new Map());
+      const hash = liveGet(rest[0]);
+      if (hash.has(rest[1])) return { type: 'int', value: 0 };
+      hash.set(rest[1], rest[2]);
+      return { type: 'int', value: 1 };
+    }
+
+    case 'HGET': {
+      if (rest.length < 2) return err('wrong number of arguments for HGET');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      const hash = liveGet(rest[0]);
+      if (!hash || !hash.has(rest[1])) return { type: 'null' };
+      return { type: 'string', value: hash.get(rest[1]) };
+    }
+
+    case 'HMGET': {
+      if (rest.length < 2) return err('wrong number of arguments for HMGET');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      const hash = liveGet(rest[0]) ?? new Map();
+      return { type: 'array', value: rest.slice(1).map(f => hash.get(f) ?? null) };
+    }
+
+    case 'HDEL': {
+      if (rest.length < 2) return err('wrong number of arguments for HDEL');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      const hash = liveGet(rest[0]);
+      if (!hash) return { type: 'int', value: 0 };
+      let count = 0;
+      for (let i = 1; i < rest.length; i++) if (hash.delete(rest[i])) count++;
+      return { type: 'int', value: count };
+    }
+
+    case 'HEXISTS': {
+      if (rest.length < 2) return err('wrong number of arguments for HEXISTS');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      const hash = liveGet(rest[0]);
+      return { type: 'int', value: hash && hash.has(rest[1]) ? 1 : 0 };
+    }
+
+    case 'HLEN': {
+      if (!rest.length) return err('wrong number of arguments for HLEN');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      return { type: 'int', value: (liveGet(rest[0]) ?? new Map()).size };
+    }
+
+    case 'HKEYS': {
+      if (!rest.length) return err('wrong number of arguments for HKEYS');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      return { type: 'array', value: [...(liveGet(rest[0]) ?? new Map()).keys()] };
+    }
+
+    case 'HVALS': {
+      if (!rest.length) return err('wrong number of arguments for HVALS');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      return { type: 'array', value: [...(liveGet(rest[0]) ?? new Map()).values()] };
+    }
+
+    case 'HGETALL': {
+      if (!rest.length) return err('wrong number of arguments for HGETALL');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      const hash = liveGet(rest[0]);
+      if (!hash) return { type: 'array', value: [] };
+      const out = [];
+      for (const [k, v] of hash) { out.push(k); out.push(v); }
+      return { type: 'array', value: out };
+    }
+
+    case 'HINCRBY': {
+      if (rest.length < 3) return err('wrong number of arguments for HINCRBY');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], new Map());
+      const hash = liveGet(rest[0]);
+      const cur = parseInt(hash.get(rest[1]) ?? '0');
+      if (isNaN(cur)) return err('ERR hash value is not an integer');
+      const next = cur + parseInt(rest[2]);
+      hash.set(rest[1], String(next));
+      return { type: 'int', value: next };
+    }
+
+    case 'HINCRBYFLOAT': {
+      if (rest.length < 3) return err('wrong number of arguments for HINCRBYFLOAT');
+      const e = assertType(rest[0], 'hash');
+      if (e) return err(e);
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], new Map());
+      const hash = liveGet(rest[0]);
+      const cur = parseFloat(hash.get(rest[1]) ?? '0');
+      if (isNaN(cur)) return err('ERR hash value is not a float');
+      const next = cur + parseFloat(rest[2]);
+      const str = String(parseFloat(next.toPrecision(17)));
+      hash.set(rest[1], str);
+      return { type: 'string', value: str };
+    }
+
+    // ── Sets ─────────────────────────────────
+    case 'SADD': {
+      if (rest.length < 2) return err('wrong number of arguments for SADD');
+      const e = assertType(rest[0], 'set');
+      if (e) return err(e);
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], new Set());
+      const set = liveGet(rest[0]);
+      let count = 0;
+      for (let i = 1; i < rest.length; i++) { if (!set.has(rest[i])) count++; set.add(rest[i]); }
+      return { type: 'int', value: count };
+    }
+
+    case 'SREM': {
+      if (rest.length < 2) return err('wrong number of arguments for SREM');
+      const e = assertType(rest[0], 'set');
+      if (e) return err(e);
+      const set = liveGet(rest[0]);
+      if (!set) return { type: 'int', value: 0 };
+      let count = 0;
+      for (let i = 1; i < rest.length; i++) if (set.delete(rest[i])) count++;
+      return { type: 'int', value: count };
+    }
+
+    case 'SMEMBERS': {
+      if (!rest.length) return err('wrong number of arguments for SMEMBERS');
+      const e = assertType(rest[0], 'set');
+      if (e) return err(e);
+      return { type: 'array', value: [...(liveGet(rest[0]) ?? new Set())] };
+    }
+
+    case 'SCARD': {
+      if (!rest.length) return err('wrong number of arguments for SCARD');
+      const e = assertType(rest[0], 'set');
+      if (e) return err(e);
+      return { type: 'int', value: (liveGet(rest[0]) ?? new Set()).size };
+    }
+
+    case 'SISMEMBER': {
+      if (rest.length < 2) return err('wrong number of arguments for SISMEMBER');
+      const e = assertType(rest[0], 'set');
+      if (e) return err(e);
+      const set = liveGet(rest[0]);
+      return { type: 'int', value: set && set.has(rest[1]) ? 1 : 0 };
+    }
+
+    case 'SMISMEMBER': {
+      if (rest.length < 2) return err('wrong number of arguments for SMISMEMBER');
+      const e = assertType(rest[0], 'set');
+      if (e) return err(e);
+      const set = liveGet(rest[0]) ?? new Set();
+      return { type: 'array', value: rest.slice(1).map(m => set.has(m) ? 1 : 0) };
+    }
+
+    case 'SUNION': {
+      const result = new Set();
+      for (const k of rest) {
+        const s = liveGet(k);
+        if (s instanceof Set) for (const v of s) result.add(v);
+      }
+      return { type: 'array', value: [...result] };
+    }
+
+    case 'SINTER': {
+      if (!rest.length) return err('wrong number of arguments for SINTER');
+      const sets = rest.map(k => liveGet(k)).filter(s => s instanceof Set);
+      if (sets.length < rest.length) return { type: 'array', value: [] };
+      const [first, ...others] = sets;
+      return { type: 'array', value: [...first].filter(v => others.every(s => s.has(v))) };
+    }
+
+    case 'SDIFF': {
+      if (!rest.length) return err('wrong number of arguments for SDIFF');
+      const first = liveGet(rest[0]);
+      if (!(first instanceof Set)) return { type: 'array', value: [] };
+      const others = rest.slice(1).map(k => liveGet(k)).filter(s => s instanceof Set);
+      return { type: 'array', value: [...first].filter(v => !others.some(s => s.has(v))) };
+    }
+
+    case 'SUNIONSTORE': {
+      if (rest.length < 2) return err('wrong number of arguments for SUNIONSTORE');
+      const result = new Set();
+      for (const k of rest.slice(1)) { const s = liveGet(k); if (s instanceof Set) for (const v of s) result.add(v); }
+      getDb().data.set(rest[0], result);
+      return { type: 'int', value: result.size };
+    }
+
+    case 'SINTERSTORE': {
+      if (rest.length < 2) return err('wrong number of arguments for SINTERSTORE');
+      const sets = rest.slice(1).map(k => liveGet(k)).filter(s => s instanceof Set);
+      const result = sets.length < rest.length - 1 ? new Set() :
+        new Set([...sets[0]].filter(v => sets.slice(1).every(s => s.has(v))));
+      getDb().data.set(rest[0], result);
+      return { type: 'int', value: result.size };
+    }
+
+    case 'SDIFFSTORE': {
+      if (rest.length < 2) return err('wrong number of arguments for SDIFFSTORE');
+      const first = liveGet(rest[1]);
+      const others = rest.slice(2).map(k => liveGet(k)).filter(s => s instanceof Set);
+      const result = first instanceof Set ? new Set([...first].filter(v => !others.some(s => s.has(v)))) : new Set();
+      getDb().data.set(rest[0], result);
+      return { type: 'int', value: result.size };
+    }
+
+    case 'SPOP': {
+      if (!rest.length) return err('wrong number of arguments for SPOP');
+      const set = liveGet(rest[0]);
+      if (!set || !(set instanceof Set) || !set.size) return { type: 'null' };
+      const val = [...set][Math.floor(Math.random() * set.size)];
+      set.delete(val);
+      return { type: 'string', value: val };
+    }
+
+    case 'SRANDMEMBER': {
+      if (!rest.length) return err('wrong number of arguments for SRANDMEMBER');
+      const set = liveGet(rest[0]);
+      if (!set || !(set instanceof Set) || !set.size) return { type: 'null' };
+      const arr = [...set];
+      const count = rest[1] ? parseInt(rest[1]) : 1;
+      if (rest[1]) {
+        const result = [];
+        const abs = Math.abs(count);
+        for (let i = 0; i < abs; i++) result.push(arr[Math.floor(Math.random() * arr.length)]);
+        return { type: 'array', value: count < 0 ? result : [...new Set(result)] };
+      }
+      return { type: 'string', value: arr[Math.floor(Math.random() * arr.length)] };
+    }
+
+    case 'SMOVE': {
+      if (rest.length < 3) return err('wrong number of arguments for SMOVE');
+      const src = liveGet(rest[0]); if (!(src instanceof Set)) return { type: 'int', value: 0 };
+      if (!src.has(rest[2])) return { type: 'int', value: 0 };
+      src.delete(rest[2]);
+      if (!liveHas(rest[1])) getDb().data.set(rest[1], new Set());
+      liveGet(rest[1]).add(rest[2]);
+      return { type: 'int', value: 1 };
+    }
+
+    // ── Sorted Sets ──────────────────────────
+    case 'ZADD': {
+      if (rest.length < 3) return err('wrong number of arguments for ZADD');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], new ZSet());
+      const zset = liveGet(rest[0]);
+      // skip NX/XX/GT/LT/CH flags
+      let i = 1, added = 0;
+      const flags = new Set(['NX','XX','GT','LT','CH']);
+      while (flags.has(rest[i]?.toUpperCase())) i++;
+      while (i + 1 < rest.length) {
+        const score = parseFloat(rest[i++]);
+        const member = rest[i++];
+        if (isNaN(score)) return err('ERR value is not a valid float');
+        if (!zset.scores.has(member)) added++;
+        zset.add(score, member);
+      }
+      return { type: 'int', value: added };
+    }
+
+    case 'ZSCORE': {
+      if (rest.length < 2) return err('wrong number of arguments for ZSCORE');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset) return { type: 'null' };
+      const s = zset.score(rest[1]);
+      return s === undefined ? { type: 'null' } : { type: 'string', value: String(s) };
+    }
+
+    case 'ZINCRBY': {
+      if (rest.length < 3) return err('wrong number of arguments for ZINCRBY');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      if (!liveHas(rest[0])) getDb().data.set(rest[0], new ZSet());
+      const zset = liveGet(rest[0]);
+      const cur = zset.score(rest[2]) ?? 0;
+      const next = cur + parseFloat(rest[1]);
+      zset.add(next, rest[2]);
+      return { type: 'string', value: String(next) };
+    }
+
+    case 'ZRANK': {
+      if (rest.length < 2) return err('wrong number of arguments for ZRANK');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset) return { type: 'null' };
+      const r = zset.rank(rest[1]);
+      return r === null ? { type: 'null' } : { type: 'int', value: r };
+    }
+
+    case 'ZREVRANK': {
+      if (rest.length < 2) return err('wrong number of arguments for ZREVRANK');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset) return { type: 'null' };
+      const r = zset.rank(rest[1]);
+      return r === null ? { type: 'null' } : { type: 'int', value: zset.card() - 1 - r };
+    }
+
+    case 'ZCARD': {
+      if (!rest.length) return err('wrong number of arguments for ZCARD');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      return { type: 'int', value: (liveGet(rest[0]) ?? { card: () => 0 }).card() };
+    }
+
+    case 'ZRANGE': {
+      if (rest.length < 3) return err('wrong number of arguments for ZRANGE');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset) return { type: 'array', value: [] };
+      const withscores = rest.map(r => r.toUpperCase()).includes('WITHSCORES');
+      const rev = rest.map(r => r.toUpperCase()).includes('REV');
+      let sorted = zset.sorted();
+      if (rev) sorted = sorted.reverse();
+      let s = parseInt(rest[1]), e2 = parseInt(rest[2]);
+      if (s < 0) s = Math.max(0, sorted.length + s);
+      if (e2 < 0) e2 = sorted.length + e2;
+      const slice = sorted.slice(s, e2 + 1);
+      const out = [];
+      for (const [m, sc] of slice) { out.push(m); if (withscores) out.push(String(sc)); }
+      return { type: 'array', value: out };
+    }
+
+    case 'ZREVRANGE': {
+      if (rest.length < 3) return err('wrong number of arguments for ZREVRANGE');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset) return { type: 'array', value: [] };
+      const withscores = rest.map(r => r.toUpperCase()).includes('WITHSCORES');
+      const sorted = zset.sorted().reverse();
+      let s = parseInt(rest[1]), e2 = parseInt(rest[2]);
+      if (s < 0) s = Math.max(0, sorted.length + s);
+      if (e2 < 0) e2 = sorted.length + e2;
+      const slice = sorted.slice(s, e2 + 1);
+      const out = [];
+      for (const [m, sc] of slice) { out.push(m); if (withscores) out.push(String(sc)); }
+      return { type: 'array', value: out };
+    }
+
+    case 'ZREM': {
+      if (rest.length < 2) return err('wrong number of arguments for ZREM');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset) return { type: 'int', value: 0 };
+      let count = 0;
+      for (let i = 1; i < rest.length; i++) if (zset.remove(rest[i])) count++;
+      return { type: 'int', value: count };
+    }
+
+    case 'ZCOUNT': {
+      if (rest.length < 3) return err('wrong number of arguments for ZCOUNT');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset) return { type: 'int', value: 0 };
+      const min = rest[1] === '-inf' ? -Infinity : parseFloat(rest[1]);
+      const max = rest[2] === '+inf' ? Infinity : parseFloat(rest[2]);
+      const count = zset.sorted().filter(([, s]) => s >= min && s <= max).length;
+      return { type: 'int', value: count };
+    }
+
+    case 'ZPOPMIN': {
+      if (!rest.length) return err('wrong number of arguments for ZPOPMIN');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset || !zset.card()) return { type: 'array', value: [] };
+      const count = rest[1] ? parseInt(rest[1]) : 1;
+      const sorted = zset.sorted();
+      const out = [];
+      for (let i = 0; i < Math.min(count, sorted.length); i++) {
+        const [m, s] = sorted[i]; zset.remove(m); out.push(m, String(s));
+      }
+      return { type: 'array', value: out };
+    }
+
+    case 'ZPOPMAX': {
+      if (!rest.length) return err('wrong number of arguments for ZPOPMAX');
+      const e = assertType(rest[0], 'zset');
+      if (e) return err(e);
+      const zset = liveGet(rest[0]);
+      if (!zset || !zset.card()) return { type: 'array', value: [] };
+      const count = rest[1] ? parseInt(rest[1]) : 1;
+      const sorted = zset.sorted().reverse();
+      const out = [];
+      for (let i = 0; i < Math.min(count, sorted.length); i++) {
+        const [m, s] = sorted[i]; zset.remove(m); out.push(m, String(s));
+      }
+      return { type: 'array', value: out };
+    }
+
+    // ── Fallback ─────────────────────────────
+    default:
+      return err(`ERR unknown command '${args[0]}', with args beginning with: ${rest.slice(0,3).map(a=>`'${a}'`).join(' ')}`);
+  }
+}
+
+function err(msg) { return { type: 'error', value: msg }; }
+
+// ─────────────────────────────────────────────
+//  Output rendering
+// ─────────────────────────────────────────────
+const output = document.getElementById('output');
+
+function appendLine(text, cls) {
+  const div = document.createElement('div');
+  div.className = `output-line ${cls}`;
+  div.textContent = text;
+  output.appendChild(div);
+}
+
+function renderResult(result, prefix = '') {
+  if (!result) return;
+  switch (result.type) {
+    case 'ok':
+      appendLine(`${prefix}+${result.value}`, 'line-ok');
+      break;
+    case 'string':
+      if (result.value.includes('\n')) {
+        appendLine(`${prefix}"""`, 'line-string');
+        result.value.split('\n').forEach(l => appendLine(l, 'line-string'));
+        appendLine(`${prefix}"""`, 'line-string');
+      } else {
+        appendLine(`${prefix}"${result.value}"`, 'line-string');
+      }
+      break;
+    case 'int':
+      appendLine(`${prefix}(integer) ${result.value}`, 'line-int');
+      break;
+    case 'null':
+      appendLine(`${prefix}(nil)`, 'line-null');
+      break;
+    case 'error':
+      appendLine(`${prefix}(error) ${result.value}`, 'line-error');
+      break;
+    case 'array':
+      if (!result.value.length) {
+        appendLine(`${prefix}(empty array)`, 'line-null');
+        break;
+      }
+      result.value.forEach((item, i) => {
+        const pre = `${prefix}${i + 1}) `;
+        if (item === null) appendLine(`${pre}(nil)`, 'line-null');
+        else if (Array.isArray(item)) {
+          appendLine(`${pre}`, 'line-array');
+          renderResult({ type: 'array', value: item }, prefix + '   ');
+        }
+        else if (typeof item === 'number') appendLine(`${pre}(integer) ${item}`, 'line-int');
+        else appendLine(`${pre}"${item}"`, 'line-string');
+      });
+      break;
+  }
+}
+
+function updateStats() {
+  document.getElementById('stat-keys').textContent = liveKeys().length;
+  document.getElementById('stat-db').textContent = currentDb;
+  document.getElementById('stat-cmds').textContent = cmdCount;
+  document.getElementById('prompt-db').textContent = currentDb > 0 ? `[${currentDb}]` : '[0]';
+}
+
+// ─────────────────────────────────────────────
+//  History & autocomplete
+// ─────────────────────────────────────────────
+const history = [];
+let histIdx = -1;
+
+const ALL_CMDS = [
+  'APPEND','COPY','DBSIZE','DECR','DECRBY','DEL','ECHO','EXISTS','EXPIRE','EXPIREAT',
+  'FLUSHALL','FLUSHDB','GET','GETDEL','GETRANGE','GETSET','HDEL','HEXISTS','HGET','HGETALL',
+  'HINCRBY','HINCRBYFLOAT','HKEYS','HLEN','HMGET','HMSET','HSET','HSETNX','HVALS',
+  'INCR','INCRBY','INCRBYFLOAT','INFO','KEYS','LINDEX','LINSERT','LLEN','LPOP','LPUSH',
+  'LPUSHX','LRANGE','LREM','LSET','LTRIM','MGET','MSET','MSETNX','OBJECT','PERSIST',
+  'PEXPIRE','PING','PSETEX','PTTL','RANDOMKEY','RENAME','RESET','RPOP','RPOPLPUSH',
+  'RPUSH','RPUSHX','SADD','SCAN','SCARD','SDIFF','SDIFFSTORE','SELECT','SET','SETEX',
+  'SETNX','SETRANGE','SINTER','SINTERSTORE','SISMEMBER','SMEMBERS','SMISMEMBER','SMOVE',
+  'SORT','SPOP','SRANDMEMBER','SREM','STRLEN','SUBSTR','SUNION','SUNIONSTORE',
+  'TTL','TYPE','UNLINK','ZADD','ZCARD','ZCOUNT','ZINCRBY','ZPOPMAX','ZPOPMIN',
+  'ZRANGE','ZRANK','ZREM','ZREVRANGE','ZREVRANK','ZSCORE','COMMAND','DEBUG','QUIT'
+];
+
+let tabCandidates = [], tabIdx = 0, tabBase = '';
+
+// ─────────────────────────────────────────────
+//  Boot message
+// ─────────────────────────────────────────────
+function boot() {
+  appendLine('Redis CLI Simulator  ·  browser-native · no backend · all data in-memory', 'line-info');
+  appendLine('Type any Redis command below. Click sidebar entries to insert templates.', 'line-info');
+  appendLine('─'.repeat(68), 'line-sep');
+  appendLine('', 'line-info');
+}
+
+// ─────────────────────────────────────────────
+//  Input handling
+// ─────────────────────────────────────────────
+const input = document.getElementById('cli-input');
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const raw = input.value.trim();
+    input.value = '';
+    tabCandidates = []; tabIdx = 0;
+    if (!raw) return;
+
+    history.unshift(raw); histIdx = -1;
+    cmdCount++;
+
+    // Echo the command
+    appendLine(`127.0.0.1:6379> ${raw}`, 'line-cmd');
+
+    const result = execCommand(raw);
+    renderResult(result);
+    appendLine('', 'line-info');
+    updateStats();
+    output.scrollTop = output.scrollHeight;
+    return;
+  }
+
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (histIdx < history.length - 1) { histIdx++; input.value = history[histIdx]; }
+    return;
+  }
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (histIdx > 0) { histIdx--; input.value = history[histIdx]; }
+    else { histIdx = -1; input.value = ''; }
+    return;
+  }
+
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const val = input.value.toUpperCase();
+    if (!val) return;
+    if (tabCandidates.length === 0 || tabBase !== val.split(' ')[0]) {
+      tabBase = val.split(' ')[0];
+      tabCandidates = ALL_CMDS.filter(c => c.startsWith(tabBase));
+      tabIdx = 0;
+    }
+    if (tabCandidates.length > 0) {
+      input.value = tabCandidates[tabIdx % tabCandidates.length];
+      tabIdx++;
+    }
+    return;
+  }
+
+  // Reset tab state on other keys
+  tabCandidates = []; tabIdx = 0;
+});
+
+function insertCmd(cmd) {
+  input.value = cmd;
+  input.focus();
+  // place cursor at end
+  const len = input.value.length;
+  input.setSelectionRange(len, len);
+}
+
+function clearOutput() {
+  output.innerHTML = '';
+  boot();
+}
+
+// Init
+boot();
+updateStats();
+input.focus();
+</script>
+</body>
+</html>

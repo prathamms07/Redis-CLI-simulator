@@ -204,6 +204,7 @@
     flex-direction: column;
     gap: 2px;
     scroll-behavior: smooth;
+    border-top: 1px solid var(--border);
   }
 
   #output::-webkit-scrollbar { width: 4px; }
@@ -236,7 +237,7 @@
     display: flex;
     align-items: center;
     padding: 12px 20px;
-    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     background: #0f0f0f;
     gap: 10px;
   }
@@ -409,8 +410,6 @@
       </div>
     </div>
 
-    <div id="output"></div>
-
     <div class="input-row">
       <span class="prompt-label">
         127.0.0.1:6379<span class="prompt-db" id="prompt-db">[0]</span>&gt;
@@ -419,6 +418,8 @@
              placeholder="type a command…" autofocus>
       <span class="input-hint">↑↓ history · Tab complete</span>
     </div>
+
+    <div id="output"></div>
   </div>
 </div>
 
